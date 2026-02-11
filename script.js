@@ -8,7 +8,7 @@ class OnboardingForm {
         this.educationInstitutions = {};
         this.universities = [];
         this.existingCSVData = null; // Store existing CSV data
-        this.existingCSVFileName = 'Employee-Detials.csv'; // Default file name - matches existing file
+        this.existingCSVFileName = 'employee_data.csv'; // Default file name
         
         this.init();
     }
@@ -19,74 +19,25 @@ class OnboardingForm {
         this.initializeStateDistricts();
         this.loadEducationData();
         this.loadUniversityData();
-        this.addRealTimeValidation();
-        this.updateProgress();
-        this.autoLoadExistingCSV(); // Automatically load existing CSV if available
-        console.log('Onboarding Form initialized successfully');
-    }
 
-    /**
-     * Automatically load existing CSV file if available
-     * Priority: 1) localStorage, 2) Fetch from folder, 3) Create new
-     */
-    autoLoadExistingCSV() {
-        // First, try to load from localStorage (for offline/local file support)
-        const savedCSVData = localStorage.getItem('employeeCSVData');
-        if (savedCSVData) {
-            try {
-                this.existingCSVData = savedCSVData;
-                const recordCount = this.countCSVRows(savedCSVData);
-                this.showAutoLoadStatus(recordCount, true);
-                console.log(`✓ Loaded from localStorage: ${recordCount} records`);
-                return;
-            } catch (e) {
-                console.log('Error loading from localStorage, trying fetch...');
+        // Initialize work experience section based on current radio selection
+        // and make sure hidden experience fields don't block form submission.
+        const initialExperienceEntries = document.querySelectorAll('.experience-entry');
+        this.experienceCount = initialExperienceEntries.length || 0;
+
+        const hasExperienceYes = document.getElementById('hasExperienceYes');
+        const hasExperienceNo = document.getElementById('hasExperienceNo');
+        if (hasExperienceYes || hasExperienceNo) {
+            const showExperience = !!(hasExperienceYes && hasExperienceYes.checked);
+            this.toggleExperienceSection(showExperience);
+            if (!showExperience) {
+                this.clearExperienceValidation();
             }
         }
 
-        // If not in localStorage, try to fetch from folder (works with server)
-        fetch('Employee-Detials.csv')
-            .then(response => {
-                if (!response.ok) throw new Error('File not found');
-                return response.text();
-            })
-            .then(csvContent => {
-                this.existingCSVData = csvContent;
-                // Save to localStorage for next time
-                localStorage.setItem('employeeCSVData', csvContent);
-                
-                const recordCount = this.countCSVRows(csvContent);
-                this.showAutoLoadStatus(recordCount, true);
-                console.log(`✓ Auto-loaded Employee-Detials.csv with ${recordCount} records`);
-            })
-            .catch(error => {
-                // No existing file found
-                this.showAutoLoadStatus(0, false);
-                console.log('Employee-Detials.csv not found. Will create on first submission.');
-            });
-    }
-
-    showAutoLoadStatus(recordCount, success) {
-        const statusDiv = document.getElementById('csvUploadStatus');
-        if (!statusDiv) return;
-
-        if (success && recordCount > 0) {
-            statusDiv.innerHTML = `
-                <div class="alert alert-success">
-                    <i class="fas fa-check-circle me-2"></i>
-                    <strong>✓ Auto-Loaded!</strong> Employee-Detials.csv<br>
-                    <small>📊 Existing Records: <strong>${recordCount}</strong> employees</small><br>
-                    <small style="color: #065f46;">✓ New entries will append automatically.</small>
-                </div>
-            `;
-        } else {
-            statusDiv.innerHTML = `
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>
-                    <small>📄 No existing records found. A new CSV will be created on first submission.</small>
-                </div>
-            `;
-        }
+        this.addRealTimeValidation();
+        this.updateProgress();
+        console.log('Onboarding Form initialized successfully');
     }
 
     bindEvents() {
@@ -179,10 +130,6 @@ class OnboardingForm {
         // Validate file type
         if (!file.name.endsWith('.csv')) {
             this.showNotification('Please select a valid CSV file', 'error');
-            const statusDiv = document.getElementById('csvUploadStatus');
-            if (statusDiv) {
-                statusDiv.innerHTML = '<div class="alert alert-danger">❌ Invalid file type. Please select a .csv file</div>';
-            }
             return;
         }
 
@@ -191,50 +138,16 @@ class OnboardingForm {
             try {
                 this.existingCSVData = e.target.result;
                 this.existingCSVFileName = file.name;
-                const recordCount = this.countCSVRows(this.existingCSVData);
-                
-                // Save to localStorage for auto-load on next page visit
-                try {
-                    localStorage.setItem('employeeCSVData', this.existingCSVData);
-                    console.log('✓ CSV saved to localStorage for auto-load');
-                } catch (storageError) {
-                    console.warn('Could not save to localStorage:', storageError);
-                }
-                
-                // Show notification
-                this.showNotification(`✓ CSV loaded: ${file.name} (${recordCount} employee records found)`, 'success');
-                
-                // Show status message in form
-                const statusDiv = document.getElementById('csvUploadStatus');
-                if (statusDiv) {
-                    statusDiv.innerHTML = `
-                        <div class="alert alert-success">
-                            <i class="fas fa-check-circle me-2"></i>
-                            <strong>File Loaded Successfully!</strong><br>
-                            <small>File: <strong>${file.name}</strong></small><br>
-                            <small>Existing Records: <strong>${recordCount}</strong> employees</small><br>
-                            <small style="color: #065f46;">Your new entry will be appended to this file.</small>
-                        </div>
-                    `;
-                }
-                
-                console.log('CSV file uploaded successfully. Records:', recordCount);
+                this.showNotification(`CSV file loaded: ${file.name} (${this.countCSVRows(this.existingCSVData)} records found)`, 'success');
+                console.log('CSV file uploaded successfully. File size:', file.size, 'bytes');
             } catch (error) {
                 this.showNotification('Error reading CSV file', 'error');
-                const statusDiv = document.getElementById('csvUploadStatus');
-                if (statusDiv) {
-                    statusDiv.innerHTML = '<div class="alert alert-danger">❌ Error reading file</div>';
-                }
                 console.error('CSV upload error:', error);
             }
         };
 
         reader.onerror = () => {
             this.showNotification('Error reading file', 'error');
-            const statusDiv = document.getElementById('csvUploadStatus');
-            if (statusDiv) {
-                statusDiv.innerHTML = '<div class="alert alert-danger">❌ Error reading file</div>';
-            }
         };
 
         reader.readAsText(file);
@@ -267,6 +180,26 @@ class OnboardingForm {
         }
         
         return rows;
+    }
+
+    /**
+     * Get CSV header as array (for Google Sheets)
+     */
+    getCSVHeaderArray() {
+        return [
+            'Salutation', 'First Name', 'Last Name', 'Full Name', "Father's Name",
+            'Date of Joining', 'Contact Number', 'Email Address', 'Gender', 'Marital Status',
+            'Date of Birth', 'Blood Group', 'Branch', 'Department', 'Designation', 'Report To',
+            'Personal Email', 'Company Email', 'Current Address', 'Permanent Address',
+            'Country', 'State', 'District', 'City', 'Pincode',
+            'Aadhar Number', 'PAN Number', 'Passport Number',
+            'Previous Interview', 'Previous Interview Details', 'Criminal Case', 'Criminal Case Details',
+            'Disability', 'Disability Details', 'E-Signature', 'Signature Date', 'Signature Place',
+            'Education Level', 'Qualification', 'Year of Passing', 'Institute Name', 'Board/University',
+            'Percentage', 'Specialization',
+            'Company', 'Job Designation', 'From Date', 'To Date', 'Company Address',
+            'Company Contact', 'CTC (Annual)', 'Reason for Leaving'
+        ];
     }
 
     /**
@@ -789,6 +722,7 @@ class OnboardingForm {
     addExperienceEntry() {
         const container = document.getElementById('experienceContainer');
         if (!container) return;
+        const newIndex = container.querySelectorAll('.experience-entry').length;
         
         const newEntry = document.createElement('div');
         newEntry.className = 'experience-entry mb-4 p-3 border rounded';
@@ -796,22 +730,22 @@ class OnboardingForm {
             <div class="row g-3">
                 <div class="col-md-4">
                     <div class="floating-input">
-                        <label for="company${this.experienceCount}">Company<span class="required">*</span></label>
-                        <input type="text" class="company" data-index="${this.experienceCount}" placeholder="Company name" required>
+                        <label for="company${newIndex}">Company<span class="required">*</span></label>
+                        <input type="text" class="company" data-index="${newIndex}" placeholder="Company name" required>
                         <div class="invalid-feedback">Please enter company name</div>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="floating-input">
-                        <label for="designation${this.experienceCount}">Designation<span class="required">*</span></label>
-                        <input type="text" class="designation" data-index="${this.experienceCount}" placeholder="Your position" required>
+                        <label for="designation${newIndex}">Designation<span class="required">*</span></label>
+                        <input type="text" class="designation" data-index="${newIndex}" placeholder="Your position" required>
                         <div class="invalid-feedback">Please enter designation</div>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="floating-input">
-                        <label for="fromDate${this.experienceCount}">From Date<span class="required">*</span></label>
-                        <input type="month" class="from-date" data-index="${this.experienceCount}" required>
+                        <label for="fromDate${newIndex}">From Date<span class="required">*</span></label>
+                        <input type="month" class="from-date" data-index="${newIndex}" required>
                         <div class="invalid-feedback">Please select from date</div>
                     </div>
                 </div>
@@ -820,20 +754,20 @@ class OnboardingForm {
             <div class="row g-3 mt-2">
                 <div class="col-md-4">
                     <div class="floating-input">
-                        <label for="toDate${this.experienceCount}">To Date</label>
-                        <input type="month" class="to-date" data-index="${this.experienceCount}" placeholder="Present if current">
+                        <label for="toDate${newIndex}">To Date</label>
+                        <input type="month" class="to-date" data-index="${newIndex}" placeholder="Present if current">
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="floating-input">
-                        <label for="experienceAddress${this.experienceCount}">Company Address</label>
-                        <input type="text" class="experience-address" data-index="${this.experienceCount}" placeholder="Company address">
+                        <label for="experienceAddress${newIndex}">Company Address</label>
+                        <input type="text" class="experience-address" data-index="${newIndex}" placeholder="Company address">
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="floating-input">
-                        <label for="companyContact${this.experienceCount}">Company Contact</label>
-                        <input type="tel" class="company-contact" data-index="${this.experienceCount}" placeholder="Company phone">
+                        <label for="companyContact${newIndex}">Company Contact</label>
+                        <input type="tel" class="company-contact" data-index="${newIndex}" placeholder="Company phone">
                     </div>
                 </div>
             </div>
@@ -841,14 +775,14 @@ class OnboardingForm {
             <div class="row g-3 mt-2">
                 <div class="col-md-3">
                     <div class="floating-input">
-                        <label for="ctc${this.experienceCount}">CTC (Annual)</label>
-                        <input type="text" class="ctc" data-index="${this.experienceCount}" placeholder="e.g., 6 LPA">
+                        <label for="ctc${newIndex}">CTC (Annual)</label>
+                        <input type="text" class="ctc" data-index="${newIndex}" placeholder="e.g., 6 LPA">
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="floating-input">
-                        <label for="reasonForLeaving${this.experienceCount}">Reason for Leaving</label>
-                        <input type="text" class="reason-for-leaving" data-index="${this.experienceCount}" placeholder="Why you left">
+                        <label for="reasonForLeaving${newIndex}">Reason for Leaving</label>
+                        <input type="text" class="reason-for-leaving" data-index="${newIndex}" placeholder="Why you left">
                     </div>
                 </div>
             </div>
@@ -858,7 +792,7 @@ class OnboardingForm {
                     <button
                         type="button"
                         class="btn btn-danger btn-sm"
-                        onclick="onboardingForm.removeExperienceEntry(${this.experienceCount})"
+                        onclick="onboardingForm.removeExperienceEntry(${newIndex})"
                     >
                         <i class="fas fa-trash me-1"></i>Delete Experience
                     </button>
@@ -933,9 +867,23 @@ class OnboardingForm {
                 if (this.experienceCount === 0) {
                     this.addExperienceEntry();
                 }
+                // Enable experience fields + restore required flags
+                container.querySelectorAll('input, select, textarea').forEach(el => {
+                    el.disabled = false;
+                    if (el.dataset.wasRequired === 'true') el.required = true;
+                });
             } else {
                 container.style.display = 'none';
                 addBtn.style.display = 'none';
+                // IMPORTANT: if Experience = No, hidden required fields should not block submit/save
+                container.querySelectorAll('input, select, textarea').forEach(el => {
+                    if (el.required) el.dataset.wasRequired = 'true';
+                    el.required = false;
+                    el.disabled = true;
+                    el.value = '';
+                    el.classList.remove('is-invalid');
+                    this.removeFieldError(el);
+                });
             }
         }
     }
@@ -1229,22 +1177,11 @@ class OnboardingForm {
         html += `
             <div class="alert alert-success">
                 <i class="fas fa-check-circle me-2"></i>
-                All required information has been provided. Ready to save.
-            </div>
-
-            <div class="alert alert-warning">
-                <i class="fas fa-file-csv me-2"></i>
-                <strong>File Info:</strong><br>
-                ${
-                    this.existingCSVData 
-                    ? `<small>📊 Existing records: <strong>${this.countCSVRows(this.existingCSVData)}</strong><br>
-                    After saving: <strong>${this.countCSVRows(this.existingCSVData) + 1}</strong> total employees</small>`
-                    : `<small>📄 New file will be created with this employee record.</small>`
-                }
+                All required information has been provided. Ready to download CSV.
             </div>
             
             <div class="text-center mt-4">
-                <p class="text-muted">Click "Confirm & Save" to append this employee's data to Employee-Details.csv</p>
+                <p class="text-muted">By downloading, you agree to all terms and conditions.</p>
             </div>
         `;
         
@@ -1315,14 +1252,14 @@ class OnboardingForm {
         const educationData = [];
         const entries = document.querySelectorAll('.education-entry');
         
-        entries.forEach((entry, index) => {
-            const level = entry.querySelector(`.education-level[data-index="${index}"]`)?.value || '';
-            const qualification = entry.querySelector(`.qualification[data-index="${index}"]`)?.value || '';
-            const yearOfPassing = entry.querySelector(`.year-of-passing[data-index="${index}"]`)?.value || '';
-            const instituteName = entry.querySelector(`.institute-name[data-index="${index}"]`)?.value || '';
-            const boardUniversity = entry.querySelector(`.board-university[data-index="${index}"]`)?.value || '';
-            const percentage = entry.querySelector(`.percentage[data-index="${index}"]`)?.value || '';
-            const specialization = entry.querySelector(`.specialization[data-index="${index}"]`)?.value || '';
+        entries.forEach((entry) => {
+            const level = entry.querySelector('.education-level')?.value || '';
+            const qualification = entry.querySelector('.qualification')?.value || '';
+            const yearOfPassing = entry.querySelector('.year-of-passing')?.value || '';
+            const instituteName = entry.querySelector('.institute-name')?.value || '';
+            const boardUniversity = entry.querySelector('.board-university')?.value || '';
+            const percentage = entry.querySelector('.percentage')?.value || '';
+            const specialization = entry.querySelector('.specialization')?.value || '';
             
             if (level || qualification || instituteName) {
                 educationData.push({
@@ -1344,15 +1281,19 @@ class OnboardingForm {
         const experienceData = [];
         const entries = document.querySelectorAll('.experience-entry');
         
-        entries.forEach((entry, index) => {
-            const company = entry.querySelector(`.company[data-index="${index}"]`)?.value || '';
-            const designation = entry.querySelector(`.designation[data-index="${index}"]`)?.value || '';
-            const fromDate = entry.querySelector(`.from-date[data-index="${index}"]`)?.value || '';
-            const toDate = entry.querySelector(`.to-date[data-index="${index}"]`)?.value || '';
-            const experienceAddress = entry.querySelector(`.experience-address[data-index="${index}"]`)?.value || '';
-            const companyContact = entry.querySelector(`.company-contact[data-index="${index}"]`)?.value || '';
-            const ctc = entry.querySelector(`.ctc[data-index="${index}"]`)?.value || '';
-            const reasonForLeaving = entry.querySelector(`.reason-for-leaving[data-index="${index}"]`)?.value || '';
+        const container = document.getElementById('experienceContainer');
+        const isHidden = container ? container.style.display === 'none' : true;
+        if (isHidden) return experienceData;
+
+        entries.forEach((entry) => {
+            const company = entry.querySelector('.company')?.value || '';
+            const designation = entry.querySelector('.designation')?.value || '';
+            const fromDate = entry.querySelector('.from-date')?.value || '';
+            const toDate = entry.querySelector('.to-date')?.value || '';
+            const experienceAddress = entry.querySelector('.experience-address')?.value || '';
+            const companyContact = entry.querySelector('.company-contact')?.value || '';
+            const ctc = entry.querySelector('.ctc')?.value || '';
+            const reasonForLeaving = entry.querySelector('.reason-for-leaving')?.value || '';
             
             if (company || designation) {
                 experienceData.push({
@@ -1374,7 +1315,9 @@ class OnboardingForm {
    generateAndDownloadCSV() {
     try {
         const formData = this.collectFormData();
-        const fileName = this.existingCSVFileName;
+
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+        const fileName = `${this.existingCSVFileName}`;
 
         // ================= GET CSV CONTENT (WITH APPEND LOGIC) =================
         // appendToCSV() handles:
@@ -1397,36 +1340,100 @@ class OnboardingForm {
         // Update internal reference to reflect appended data
         this.existingCSVData = csvContent;
 
-        // Save updated CSV to localStorage for auto-load on next page visit
-        try {
-            localStorage.setItem('employeeCSVData', csvContent);
-            console.log('✓ Updated CSV saved to localStorage');
-        } catch (storageError) {
-            console.warn('Could not save to localStorage:', storageError);
-        }
+        this.showNotification('Employee record appended and CSV downloaded successfully!', 'success');
 
-        // ================= CONFIRMATION & NOTIFICATION =================
-        const totalRecords = this.countCSVRows(csvContent);
-        const message = this.existingCSVData 
-            ? `✓ Employee data saved! Total records: ${totalRecords}`
-            : `✓ New Employee-Details.csv created with 1 record`;
-        
-        this.showNotification(message, 'success');
-
-        // Close modal and reset form after successful save
-        const modalElement = document.getElementById('summaryModal');
-        if (modalElement) {
-            const modal = bootstrap.Modal.getInstance(modalElement);
-            if (modal) modal.hide();
-        }
-        
+        // Reset form after successful download
         this.resetForm();
 
     } catch (error) {
         console.error(error);
-        this.showNotification('Error saving employee data to CSV', 'error');
+        this.showNotification('Error generating CSV', 'error');
     }
 }
+
+    /**
+     * Submit and save to Google Sheet via Node.js server
+     */
+    async submitAndSaveToSheet() {
+        // Fixed configuration (no manual setup UI)
+        const sheetId = '1MxD7xPUw7fpRshi_tPxM306yZVtwyxG66LXOF8cDVVE';
+        const serverUrl = `${window.location.origin}/api/save-to-sheet`;
+
+        if (!sheetId) {
+            this.showNotification('Google Sheet ID not configured. Please set it in Google Sheet Setup.', 'error');
+            return;
+        }
+
+        const submitBtn = document.getElementById('submitToSheetBtn');
+        const summaryContent = document.getElementById('summaryContent');
+
+        function showSuccessAndClose() {
+            if (summaryContent) {
+                summaryContent.innerHTML = `
+                    <div class="text-center py-4">
+                        <div class="rounded-circle bg-success d-inline-flex align-items-center justify-content-center mb-3" style="width:64px;height:64px;">
+                            <i class="fas fa-check text-white" style="font-size:1.75rem;"></i>
+                        </div>
+                        <h5 class="text-success mb-2">Your data has been saved successfully.</h5>
+                        <p class="text-muted mb-0">Thank you for submitting your information.</p>
+                    </div>
+                `;
+            }
+            if (submitBtn) submitBtn.style.display = 'none';
+            setTimeout(() => {
+                const summaryModal = document.getElementById('summaryModal');
+                if (summaryModal) {
+                    const modal = bootstrap.Modal.getInstance(summaryModal);
+                    if (modal) modal.hide();
+                }
+                this.resetForm();
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.style.display = '';
+                    submitBtn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>Submit';
+                }
+            }, 2200);
+        }
+
+        function showError(msg) {
+            this.showNotification(msg || 'Could not save. Check server is running and Sheet ID is correct.', 'error');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>Submit';
+            }
+        }
+
+        try {
+            const formData = this.collectFormData();
+            const { header, rows } = this.getSheetRowsFromFormData(formData);
+
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving...';
+            }
+            if (summaryContent) {
+                summaryContent.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary mb-2" role="status"></div><p class="mb-0">Saving your data...</p></div>';
+            }
+
+            const response = await fetch(serverUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sheetId: sheetId.trim(), header, rows })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.showNotification('Your data has been saved successfully.', 'success');
+                showSuccessAndClose.call(this);
+            } else {
+                showError.call(this, data.error || 'Failed to save data');
+            }
+        } catch (error) {
+            console.error('Submit error:', error);
+            showError.call(this, 'Server error. Make sure Node.js server is running on ' + serverUrl);
+        }
+    }
 
 
 
@@ -1525,7 +1532,66 @@ createCSVRow(formData, eduIndex, expIndex, includeBasicAndCompany = true) {
     return row.map(v => this.escapeCSV(v)).join(',');
 }
 
+    /**
+     * Create row as array (for Google Sheets)
+     */
+    createCSVRowAsArray(formData, eduIndex, expIndex, includeBasicAndCompany = true) {
+        const row = [];
+        const education = formData.education || [];
+        const experience = formData.experience || [];
 
+        if (includeBasicAndCompany) {
+            row.push(
+                formData.personal.salutation || '', formData.personal.firstName || '', formData.personal.lastName || '',
+                formData.personal.fullName || '', formData.personal.fatherName || '', formData.personal.dateOfJoining || '',
+                formData.personal.contactNumber || '', formData.personal.emailAddress || '', formData.personal.gender || '',
+                formData.personal.maritalStatus || '', formData.personal.dateOfBirth || '', formData.personal.bloodGroup || '',
+                formData.company.branch || '', formData.company.department || '', formData.company.designation || '',
+                formData.company.reportTo || '', formData.address.personalEmail || '', formData.address.companyEmail || '',
+                formData.address.currentAddress || '', formData.address.permanentAddress || '', formData.address.country || '',
+                formData.address.state || '', formData.address.district || '', formData.address.city || '',
+                formData.address.pincode || '', formData.identification.aadharNumber || '', formData.identification.panNumber || '',
+                formData.identification.passportNumber || '', formData.other.previousInterview || '', formData.other.previousInterviewDetails || '',
+                formData.other.criminalCase || '', formData.other.criminalCaseDetails || '', formData.other.disability || '',
+                formData.other.disabilityDetails || '', formData.other.esignature || '', formData.other.signatureDate || '',
+                formData.other.signaturePlace || ''
+            );
+        } else {
+            for (let i = 0; i < 37; i++) row.push('');
+        }
+
+        if (education[eduIndex]) {
+            const edu = education[eduIndex];
+            row.push(edu.level || '', edu.qualification || '', edu.yearOfPassing || '', edu.instituteName || '',
+                edu.boardUniversity || '', edu.percentage || '', edu.specialization || '');
+        } else {
+            for (let i = 0; i < 7; i++) row.push('');
+        }
+
+        if (experience[expIndex]) {
+            const exp = experience[expIndex];
+            row.push(exp.company || '', exp.designation || '', exp.fromDate || '', exp.toDate || '',
+                exp.experienceAddress || '', exp.companyContact || '', exp.ctc || '', exp.reasonForLeaving || '');
+        } else {
+            for (let i = 0; i < 8; i++) row.push('');
+        }
+
+        return row;
+    }
+
+    /**
+     * Get sheet rows from form data (same format as CSV)
+     */
+    getSheetRowsFromFormData(formData) {
+        const header = this.getCSVHeaderArray();
+        const rows = [];
+        const maxRows = Math.max(1, (formData.education || []).length, (formData.experience || []).length);
+        rows.push(this.createCSVRowAsArray(formData, 0, 0, true));
+        for (let i = 1; i < maxRows; i++) {
+            rows.push(this.createCSVRowAsArray(formData, i, i, false));
+        }
+        return { header, rows };
+    }
 
 escapeCSV(value) {
     if (!value) return '';
@@ -1542,18 +1608,6 @@ escapeCSV(value) {
         const form = document.getElementById('onboardingForm');
         if (form) {
             form.reset();
-        }
-        
-        // Clear CSV file input
-        const csvFileInput = document.getElementById('csvFileInput');
-        if (csvFileInput) {
-            csvFileInput.value = '';
-        }
-        
-        // Clear CSV upload status message
-        const csvUploadStatus = document.getElementById('csvUploadStatus');
-        if (csvUploadStatus) {
-            csvUploadStatus.innerHTML = '';
         }
         
         this.currentSection = 1;
