@@ -3,18 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Employee Migration Form </title>
-    <!-- Bootstrap 5 CSS -->
+    <title>Employee Migration Form</title>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
       rel="stylesheet"
     />
-    <!-- Font Awesome -->
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
     />
-    <!-- Custom CSS -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="style.css" />
   </head>
 
@@ -31,21 +32,19 @@
               onerror="this.style.display = 'none'"
             />
           </div>
-          <h4 class="form-title">Employee Migration Form</h4>
-          <p class="text-muted">
+          <h1 class="form-title">Employee Migration Form</h1>
+          <p class="form-subtitle">
             Please fill all the required information accurately
           </p>
-          <div class="alert alert-info d-flex align-items-center">
+          <div class="alert alert-info d-flex align-items-center alert-info-custom">
             <i class="fas fa-info-circle me-2"></i>
             <small>Form data will be saved to Google Sheet after submission</small>
           </div>
-
-         
         </div>
 
         <!-- Progress Bar -->
         <div class="progress-container mb-4">
-          <div class="progress" style="height: 8px">
+          <div class="progress progress-thin">
             <div
               class="progress-bar"
               id="formProgress"
@@ -382,7 +381,7 @@
 
             <div class="row g-3">
               <div class="col-md-6">
-                <h5>Current Address<span class="required">*</span></h5>
+                <h6 class="address-subheading">Current Address<span class="required">*</span></h6>
                 <div class="floating-input">
                   <textarea
                     id="currentAddress"
@@ -396,7 +395,7 @@
                 </div>
               </div>
               <div class="col-md-6">
-                <h5>Permanent Address<span class="required">*</span></h5>
+                <h6 class="address-subheading">Permanent Address<span class="required">*</span></h6>
                 <div class="floating-input">
                   <textarea
                     id="permanentAddress"
@@ -604,7 +603,7 @@
                       <label for="educationLevel0"
                         >Level<span class="required">*</span></label
                       >
-                      <select class="education-level" data-index="0" required>
+                      <select id="educationLevel0" class="education-level" data-index="0" required>
                         <option value="" selected disabled>Select</option>
                         <option value="10th/Matriculation">
                           10th/Matriculation
@@ -795,7 +794,7 @@
               </div>
             </div>
 
-            <div id="experienceContainer" style="display: none">
+            <div id="experienceContainer" class="toggle-container-hidden" style="display: none">
               <div class="experience-entry mb-4 p-3 border rounded">
                 <div class="row g-3">
                   <div class="col-md-4">
@@ -915,7 +914,7 @@
             </div>
 
             <div
-              class="text-end mb-3"
+              class="text-end mb-3 toggle-add-btn"
               id="addExperienceBtn"
               style="display: none"
             >
@@ -989,7 +988,7 @@
               </div>
               <div class="invalid-feedback">Please select an option</div>
               <div
-                class="mt-2"
+                class="mt-2 toggle-details"
                 id="previousInterviewDetails"
                 style="display: none"
               >
@@ -1045,7 +1044,7 @@
                 <label class="form-check-label" for="criminalCaseNo">No</label>
               </div>
               <div class="invalid-feedback">Please select an option</div>
-              <div class="mt-2" id="criminalCaseDetails" style="display: none">
+              <div class="mt-2 toggle-details" id="criminalCaseDetails" style="display: none">
                 <div class="floating-input">
                   <label for="caseDetails">Case Details</label>
                   <textarea
@@ -1088,7 +1087,7 @@
                 <label class="form-check-label" for="disabilityNo">No</label>
               </div>
               <div class="invalid-feedback">Please select an option</div>
-              <div class="mt-2" id="disabilityDetails" style="display: none">
+              <div class="mt-2 toggle-details" id="disabilityDetails" style="display: none">
                 <div class="floating-input">
                   <label for="disabilityDetail">Disability Details</label>
                   <textarea
@@ -1233,10 +1232,13 @@
       tabindex="-1"
       aria-labelledby="summaryModalLabel"
       aria-hidden="true"
+      data-bs-backdrop="true"
+      data-bs-keyboard="true"
+      data-bs-focus="true"
     >
-      <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header bg-primary text-white">
+      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content modal-content-custom">
+          <div class="modal-header modal-header-custom">
             <h5 class="modal-title" id="summaryModalLabel">
               <i class="fas fa-file-alt me-2"></i>Review Your Application
             </h5>
@@ -1247,34 +1249,32 @@
               aria-label="Close"
             ></button>
           </div>
-          <div class="modal-body" id="summaryContent">
+          <div class="modal-body modal-body-custom" id="summaryContent">
             <!-- Summary content will be loaded here -->
           </div>
-          <div class="modal-footer d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div class="modal-footer modal-footer-custom">
             <button
               type="button"
-              class="btn btn-secondary"
+              class="btn btn-outline-secondary"
               data-bs-dismiss="modal"
             >
               <i class="fas fa-edit me-1"></i>Edit Application
             </button>
-            <div class="d-flex align-items-center gap-2">
-              <button
-                type="button"
-                class="btn btn-success btn-lg px-4"
-                id="submitToSheetBtn"
-                onclick="onboardingForm.submitAndSaveToSheet()"
-              >
-                <i class="fas fa-paper-plane me-1"></i>Submit
-              </button>
-            </div>
+            <button
+              type="button"
+              class="btn btn-success btn-submit-modal"
+              id="submitToSheetBtn"
+              data-action="submit-to-sheet"
+            >
+              <i class="fas fa-paper-plane me-1"></i>Submit
+            </button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="script.js"></script>
+    <!-- Scripts - defer ensures DOM ready before execution -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" defer></script>
+    <script src="script.js" defer></script>
   </body>
 </html>

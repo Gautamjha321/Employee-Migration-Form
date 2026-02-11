@@ -84,6 +84,16 @@ class OnboardingForm {
             onboardingForm.addEventListener('submit', (e) => this.handleSubmit(e));
         }
 
+        // Modal submit button - use event delegation for reliable cross-browser behavior
+        document.body.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-action="submit-to-sheet"]');
+            if (btn && !btn.disabled && window.onboardingForm) {
+                e.preventDefault();
+                e.stopPropagation();
+                window.onboardingForm.submitAndSaveToSheet();
+            }
+        });
+
         // Institute/University autocomplete
         document.addEventListener('input', (e) => {
             if (e.target.classList.contains('institute-name')) {
@@ -92,6 +102,17 @@ class OnboardingForm {
             if (e.target.classList.contains('board-university')) {
                 this.showUniversitySuggestions(e.target);
             }
+        });
+
+        // Suggestion item clicks - event delegation for dynamically created elements
+        document.addEventListener('click', (e) => {
+            const item = e.target.closest('.suggestion-item');
+            if (!item || !window.onboardingForm) return;
+            const idx = item.getAttribute('data-index');
+            const inst = item.getAttribute('data-institute');
+            const uni = item.getAttribute('data-university');
+            if (idx !== null && inst !== null) window.onboardingForm.selectInstitute(idx, inst);
+            if (idx !== null && uni !== null) window.onboardingForm.selectUniversity(idx, uni);
         });
 
         // CSV Upload handler
@@ -346,9 +367,10 @@ class OnboardingForm {
             radio.addEventListener('change', () => {
                 const radioName = radio.name;
                 const radioGroup = document.querySelectorAll(`input[name="${radioName}"]`);
-                const errorDiv = document.getElementById(`${radioName}Error`) || 
-                               radioGroup[0].closest('.form-check')?.nextElementSibling;
-                
+                const firstRadio = radioGroup[0];
+                const errorDiv = document.getElementById(`${radioName}Error`) ||
+                    (firstRadio ? firstRadio.closest('.form-check')?.nextElementSibling : null);
+
                 if (document.querySelector(`input[name="${radioName}"]:checked`)) {
                     radioGroup.forEach(r => r.classList.remove('is-invalid'));
                     if (errorDiv && errorDiv.classList.contains('invalid-feedback')) {
@@ -575,8 +597,8 @@ class OnboardingForm {
             suggestions = ['Other - Please specify'];
         }
         
-        suggestionsDiv.innerHTML = suggestions.map(inst => 
-            `<div class="suggestion-item" onclick="onboardingForm.selectInstitute('${index}', '${inst.replace(/'/g, "\\'")}')">${inst}</div>`
+        suggestionsDiv.innerHTML = suggestions.map(inst =>
+            `<div class="suggestion-item" data-index="${index}" data-institute="${inst.replace(/"/g, '&quot;')}">${inst}</div>`
         ).join('');
         
         suggestionsDiv.style.display = 'block';
@@ -598,8 +620,9 @@ class OnboardingForm {
             uni.toLowerCase().includes(value)
         );
         
-        suggestionsDiv.innerHTML = suggestions.map(uni => 
-            `<div class="suggestion-item" onclick="onboardingForm.selectUniversity('${index}', '${uni.replace(/'/g, "\\'")}')">${uni}</div>`
+        const escapeForAttr = (s) => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        suggestionsDiv.innerHTML = suggestions.map(uni =>
+            `<div class="suggestion-item" data-index="${index}" data-university="${uni.replace(/"/g, '&quot;')}">${uni}</div>`
         ).join('');
         
         suggestionsDiv.style.display = 'block';
@@ -977,8 +1000,8 @@ class OnboardingForm {
         if (section === 5) {
             const hasExperienceYes = document.getElementById('hasExperienceYes');
             const hasExperienceNo = document.getElementById('hasExperienceNo');
-            
-            if (!hasExperienceYes.checked && !hasExperienceNo.checked) {
+
+            if (!hasExperienceYes?.checked && !hasExperienceNo?.checked) {
                 isValid = false;
                 const errorDiv = document.getElementById('experienceError');
                 if (errorDiv) {
@@ -992,11 +1015,11 @@ class OnboardingForm {
                 }
             }
             
-            if (hasExperienceNo.checked) {
+            if (hasExperienceNo?.checked) {
                 return true;
             }
-            
-            if (hasExperienceYes.checked) {
+
+            if (hasExperienceYes?.checked) {
                 const experienceEntries = document.querySelectorAll('.experience-entry');
                 if (experienceEntries.length === 0) {
                     this.showNotification('Please add at least one work experience', 'error');
@@ -1188,8 +1211,8 @@ class OnboardingForm {
         summaryContent.innerHTML = html;
         
         const modalElement = document.getElementById('summaryModal');
-        if (modalElement) {
-            const modal = new bootstrap.Modal(modalElement);
+        if (modalElement && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
             modal.show();
         }
     }
@@ -1355,7 +1378,9 @@ class OnboardingForm {
      * Submit and save to Google Sheet via Node.js server
      */
     async submitAndSaveToSheet() {
-        // Fixed configuration (no manual setup UI)
+        const submitBtn = document.getElementById('submitToSheetBtn');
+        if (submitBtn && submitBtn.disabled) return;
+
         const sheetId = '1MxD7xPUw7fpRshi_tPxM306yZVtwyxG66LXOF8cDVVE';
         const serverUrl = `${window.location.origin}/api/save-to-sheet`;
 
@@ -1364,9 +1389,8 @@ class OnboardingForm {
             return;
         }
 
-        const submitBtn = document.getElementById('submitToSheetBtn');
         const summaryContent = document.getElementById('summaryContent');
-
+        const self = this;
         function showSuccessAndClose() {
             if (summaryContent) {
                 summaryContent.innerHTML = `
@@ -1382,11 +1406,11 @@ class OnboardingForm {
             if (submitBtn) submitBtn.style.display = 'none';
             setTimeout(() => {
                 const summaryModal = document.getElementById('summaryModal');
-                if (summaryModal) {
+                if (summaryModal && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
                     const modal = bootstrap.Modal.getInstance(summaryModal);
                     if (modal) modal.hide();
                 }
-                this.resetForm();
+                self.resetForm();
                 if (submitBtn) {
                     submitBtn.disabled = false;
                     submitBtn.style.display = '';
@@ -1421,23 +1445,28 @@ class OnboardingForm {
                 body: JSON.stringify({ sheetId: sheetId.trim(), header, rows })
             });
 
-            const data = await response.json();
+            let data;
+            try {
+                const text = await response.text();
+                data = text ? JSON.parse(text) : {};
+            } catch (parseErr) {
+                console.error('Response parse error:', parseErr);
+                throw new Error('Invalid server response');
+            }
 
-            if (data.success) {
+            if (data && data.success) {
                 this.showNotification('Your data has been saved successfully.', 'success');
                 showSuccessAndClose.call(this);
             } else {
-                showError.call(this, data.error || 'Failed to save data');
+                showError.call(this, (data && data.error) || 'Failed to save data');
             }
         } catch (error) {
             console.error('Submit error:', error);
-            showError.call(this, 'Server error. Make sure Node.js server is running on ' + serverUrl);
+            showError.call(this, error.message || 'Server error. Make sure Node.js server is running on ' + serverUrl);
         }
     }
 
-
-
-createCSVRow(formData, eduIndex, expIndex, includeBasicAndCompany = true) {
+    createCSVRow(formData, eduIndex, expIndex, includeBasicAndCompany = true) {
     const row = [];
 
     // ================= BASIC + COMPANY =================
@@ -1660,9 +1689,11 @@ escapeCSV(value) {
         }
         
         // Hide conditional fields
-        document.getElementById('previousInterviewDetails').style.display = 'none';
-        document.getElementById('criminalCaseDetails').style.display = 'none';
-        document.getElementById('disabilityDetails').style.display = 'none';
+        const conditionalFields = ['previousInterviewDetails', 'criminalCaseDetails', 'disabilityDetails'];
+        conditionalFields.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        });
         
         // Reset progress
         this.updateProgress();
